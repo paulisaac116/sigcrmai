@@ -1,0 +1,1 @@
+from sigcrmai import app
