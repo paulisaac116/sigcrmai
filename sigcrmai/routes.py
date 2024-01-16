@@ -28,11 +28,12 @@ def openai():
     question = body['question']
     companyId = body['companyId']
     companyId = str(companyId)
+    ngrok = body['ngrok']
 
     os.environ['OPENAI_API_KEY'] = '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'
     client = OpenAI()
 
-    api_url = "https://c6c2-181-196-72-14.ngrok-free.app/api/services/" + companyId
+    api_url = ngrok + "/api/services/" + companyId
     response_list = []
     response = requests.get(api_url)
 
