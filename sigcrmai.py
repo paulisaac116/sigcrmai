@@ -24,15 +24,28 @@ def openai():
     if 'companyId' not in body:
         return 'No companyId provided', 400
     
+    if 'apiKey' not in body:
+        return 'No apiKey provided', 400
+    
+    if 'mainDomain' not in body:
+        return 'No mainDomain provided', 400
+    
+    if 'apiUrl' not in body:
+        return 'No apiUrl provided', 400
+    
     question = body['question']
-    companyId = body['companyId']
-    companyId = str(companyId)
-    ngrok = body['ngrok']
+    company_id = body['companyId']
+    company_id = str(company_id)
+    api_key = body['apiKey']
+    main_domain = body['mainDomain']
+    api_url = body['apiUrl']
 
-    os.environ['OPENAI_API_KEY'] = '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'
+    os.environ['OPENAI_API_KEY'] = api_key
     client = OpenAI()
 
-    api_url = ngrok + "/api/services/" + companyId
+    api_url = main_domain + "/" + api_url + "/" + company_id
+    # print(api_url)
+    # return
     response_list = []
     response = requests.get(api_url)
 
