@@ -134,6 +134,49 @@ def openai():
 
     return response, 200
 
+@app.route('/api/create-embedding', methods=['POST'])
+def create_embedding():
+    
+    body = request.get_json()
+
+    if 'companyId' not in body:
+        return 'No companyId provided', 400
+    
+    if 'apiKey' not in body:
+        return 'No apiKey provided', 400
+    
+    if 'mainDomain' not in body:
+        return 'No mainDomain provided', 400
+    
+    if 'apiUrl' not in body:
+        return 'No apiUrl provided', 400
+
+    company_id = str(body['companyId'])
+    api_key = body['apiKey']
+    main_domain = body['mainDomain']
+    api_url = body['apiUrl']
+    full_url = main_domain + "/" + api_url + "/" + company_id
+
+    os.environ['OPENAI_API_KEY'] = api_key
+    client = OpenAI()
+    
+    response_list = []
+    response = requests.get(full_url)
+    if response.status_code == 200:
+        data = response.json()
+        response_list = data['data']
+    else:
+        return "Error: ", response.status_code
+    
+    # create the 'concat_feature' column
+    df_concat_feature = pd.DataFrame(response_list)
+    df_concat_feature['concat_feature'] = "Cargo: " + df_concat_feature['positionName'] + ' | ' + "Descripción: " + df_concat_feature['positionDescription']
+    # create the 'embedding' column
+    df_concat_feature['embedding'] = df_concat_feature['concat_feature'].apply(lambda x: client.embeddings.create(model='text-embedding-ada-002', input=x, encoding_format='float').data[0].embedding)
+    df_contat_feature_json = df_concat_feature.to_dict(orient='records')
+
+    return df_contat_feature_json, 200
+
 
 if __name__ == "_main_":
     app.run(host='0.0.0.0', port=5000)
