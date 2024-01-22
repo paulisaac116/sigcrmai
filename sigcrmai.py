@@ -11,9 +11,9 @@ app = Flask(__name__)
 
 @app.route('/index')
 def index():
-    return "Hello, Worldfdsafs!"
+    return "Hello, You Human!"
 
-@app.route('/api/openai', methods=['POST'])
+@app.route('/api/answer-question', methods=['POST'])
 def openai():
 
     body = request.get_json()
@@ -39,6 +39,7 @@ def openai():
     api_key = body['apiKey']
     main_domain = body['mainDomain']
     api_url = body['apiUrl']
+    conversation_history = body['chatHistory']
 
     os.environ['OPENAI_API_KEY'] = api_key
     client = OpenAI()
@@ -82,48 +83,51 @@ def openai():
 
         return df.sort_values("similarities", ascending=False)
 
-    # Rest of your functions remain the same
-    def get_prompt(question, df_similars):
-      prompt = f"""
-                CONTEXTO:
+    def get_response(question, df_similars):
+        client = OpenAI()
 
-                Soy un asistente virtual de una empresa encargada en ofrecer los servicios de expertos y expertas en desarrollo de sofware, desarrollo de aplicaciones web y desarrollo de aplicaciones móviles.
-                Ayudo a las personas a encontrar el cargo que mejor cumpla con las habilidades y conocimientos solicitados. Un cliente me ha hecho la siguiente pregunta:
+        bot_messages = [
+          {"role": "system", "content": f"""Asistente es un chatbot virtual amable de una empresa encargada en ofrecer los servicios de expertos y expertas en desarrollo de sofware, desarrollo de aplicaciones web y desarrollo de aplicaciones móviles. Asistente ayuda a los usuarios a brindar información sobre los servicios o cargos de la empresa, y a agendar un turno para ser atendido con un trabajador.     
+               
+               Contexto:
+               - El usuario hace una pregunta sobre los servicios de la empresa o solicitando información sobre un cargo disponible
+               - El usuario puede preguntar por un cargo disponible o por un horario de atención
+               - El usuario puede solicitar realizar el agendamiento de un turno en base al HORARIO DE AGENDAMIENTO DISPONIBLE de un trabajador
+               
+               INSTRUCCIONES:
+                - Si no existe un CARGO DEL TRABAJADOR que coincida con los cargos disponibles, no inventar
+                - Si el usuario pregunta por un CARGO DEL TRABAJADOR que si existe responder con la información de HORARIO DE AGENDAMIENTO DISPONIBLE
+                - Si el usuario pregunta por un horario de atención, por una fecha u hora primero preguntar para qué cargo desea obtener información
+                - Si no existe un HORARIO DE AGENDAMIENTO DISPONIBLE para el CARGO DEL TRABAJADOR, responder que no existe
+                - Si el usuario no solicita información, preguntar en qué necesita ayuda sobre los servicios de la empresa 
+               
+               HORARIO DE AGENDAMIENTO DISPONIBLE:
+                - NOMBRE DEL TRABAJADOR: {df_similars.iloc[0]['employeeNames'] + " " + df_similars.iloc[0]['employeeLastNames']}
+                - CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
+                - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
+                - HORARIO DE INICIO DEL TRABAJADOR: {df_similars.iloc[0]['startTime']}
+                - HORARIO DE FINALIZACIÓN DEL TRABAJADOR: {df_similars.iloc[0]['endTime']}
+                - DÍA DE LA SEMANA DEL HORARIO DEL TRABAJADOR: {df_similars.iloc[0]['day']}
 
-                PERSONALIDAD:
+                CARGO DEL TRABAJADOR:
+                - CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
+                - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
 
-                Útil, alegre, experto en recomendaciones
+        """}]
 
-                CARGO DISPONIBLE:
+        for message in conversation_history:
+            bot_messages.append(message)
+        
+        bot_messages.append({"role": "user", "content": question})
 
-                - Nombre del cargo: {df_similars.iloc[0]['positionName']}
-                - Descripción: {df_similars.iloc[0]['positionDescription']}
-
-                INSTRUCCIÓN:
-                - Solo responde en base al CARGO DISPONIBLE
-                - Si no contamos con un cargo adecuado a las necesidades el cliente, no inventes nada
-
-                CONVERSACIÓN:
-
-                Cliente: {question}
-                Bot:"""
-      return prompt
-
-    def get_response(prompt):
-      client = OpenAI()
-
-      completion = client.chat.completions.create(
-          model="gpt-3.5-turbo",
-          messages=[
-              {"role": "system", "content": "Tú eres un asistente útil"},
-              {"role": "user", "content": prompt}
-          ]
-      )
-      return completion.choices[0].message.content
+        completion = client.chat.completions.create(
+            model = "gpt-4",
+            messages = bot_messages,
+        )
+        return completion.choices[0].message.content
     
     df_similars = get_df_similares(question, df_positions)
-    prompt = get_prompt(question, df_similars)
-    answer = get_response(prompt)
+    answer = get_response(question, df_similars)
 
     response = {
         'answer': answer,
@@ -132,74 +136,6 @@ def openai():
     }
 
     return response, 200
-
-
-@app.route('/api/answer-question', methods=['POST'])
-def answer_question():
-
-    
-    body = request.get_json()
-    question = body['question']
-    api_key = body['apiKey']
-    
-    os.environ['OPENAI_API_KEY'] = api_key
-    client = OpenAI()
-
-    # get the embeddings of the CRM db
-    full_url = "https://api.sigcrmai.com/api/v1/position"
-    positions = []
-    response = requests.get(full_url)
-    if response.status_code == 200:
-        data = response.json()
-        positions = data['data']
-    else:
-        return "Error: ", response.status_code
-
-    def get_df_similares(question, df_embeddings):
-        question_embedding = client.embeddings.create(model="text-embedding-ada-002",
-                                                    input=question,
-                                                    encoding_format="float").data[0].embedding
-
-
-        question_embedding_arr = np.array(question_embedding).reshape(1, -1)
-        df_embeddings['embedding'] = df_embeddings['embedding'].apply(lambda x: np.array(x).reshape(1, -1))
-
-        # Buscamos los productos más similares a la pregunta
-        # se genera un cosine_similarity (score) a todos los productos respecto a la pregunta realizada anteriormente
-        df_embeddings["similarities"] = df_embeddings['embedding'].apply(lambda x: cosine_similarity(x, question_embedding_arr))
-        df_embeddings = df_embeddings.sort_values("similarities", ascending=False)
-
-        return df_embeddings
-    
-    # crear el prompt
-    def get_promtp(question, df_similars):
-        prompt = f"""
-                    CONTEXTO:
-
-                    Soy un asistente virtual de una empresa encargada en ofrecer los servicios de expertos y expertas en desarrollo de sofware, desarrollo de aplicaciones web y desarrollo de aplicaciones móviles.
-                    Ayudo a las personas a encontrar el cargo que mejor cumpla con las habilidades y conocimientos solicitados. Un cliente me ha hecho la siguiente pregunta:
-
-                    PERSONALIDAD:
-
-                    Útil, alegre, experto en recomendaciones
-
-                    CARGO DISPONIBLE:
-
-                    - Nombre del cargo: {df_similars.iloc[0]['positionName']}
-                    - Descripción: {df_similars.iloc[0]['positionDescription']}
-
-                    INSTRUCCIÓN:
-                    - Solo responde en base al CARGO DISPONIBLE
-                    - Si no contamos con un cargo adecuado a las necesidades el cliente, no inventes nada
-
-                    CONVERSACIÓN:
-
-                    Cliente: {question}
-                    Bot:"""
-        return prompt
-
-
-
 
 @app.route('/api/create-embedding', methods=['POST'])
 def create_embedding():
