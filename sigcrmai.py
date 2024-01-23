@@ -127,7 +127,6 @@ def openai():
     
     df_similars = get_df_similares(question, df_positions)
     answer = get_response(question, df_similars)
-    # answer = get_response(question, [])
 
     response = {
         'answer': answer,
