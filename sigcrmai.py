@@ -54,7 +54,7 @@ def openai():
     else:
         return "Error: ", response.status_code
     
-    # create the 'concat_feature' column
+    # # create the 'concat_feature' column
     df_positions = pd.DataFrame(positions)
     df_positions['concat_feature'] = "Nombre de la Posición: " + df_positions['positionName'] + ' | ' + "Descripción: " + df_positions['positionDescription']
 
@@ -100,19 +100,6 @@ def openai():
                 - Si el usuario pregunta por un horario de atención, por una fecha u hora primero preguntar para qué cargo desea obtener información
                 - Si no existe un HORARIO DE AGENDAMIENTO DISPONIBLE para el CARGO DEL TRABAJADOR, responder que no existe
                 - Si el usuario no solicita información, preguntar en qué necesita ayuda sobre los servicios de la empresa 
-               
-               HORARIO DE AGENDAMIENTO DISPONIBLE:
-                - NOMBRE DEL TRABAJADOR: {df_similars.iloc[0]['employeeNames'] + " " + df_similars.iloc[0]['employeeLastNames']}
-                - CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
-                - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
-                - HORARIO DE INICIO DEL TRABAJADOR: {df_similars.iloc[0]['startTime']}
-                - HORARIO DE FINALIZACIÓN DEL TRABAJADOR: {df_similars.iloc[0]['endTime']}
-                - DÍA DE LA SEMANA DEL HORARIO DEL TRABAJADOR: {df_similars.iloc[0]['day']}
-
-                CARGO DEL TRABAJADOR:
-                - CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
-                - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
-
         """}]
 
         for message in conversation_history:
@@ -121,13 +108,14 @@ def openai():
         bot_messages.append({"role": "user", "content": question})
 
         completion = client.chat.completions.create(
-            model = "gpt-4",
+            model = "gpt-3.5-turbo",
             messages = bot_messages,
         )
         return completion.choices[0].message.content
     
     df_similars = get_df_similares(question, df_positions)
     answer = get_response(question, df_similars)
+    # answer = get_response(question, [])
 
     response = {
         'answer': answer,
