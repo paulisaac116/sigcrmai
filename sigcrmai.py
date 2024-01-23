@@ -61,9 +61,19 @@ def openai():
     else:
         return "Error: ", response.status_code
     
-    # # create the 'concat_feature' column
     df_positions = pd.DataFrame(positions)
-    df_positions['concat_feature'] = "Nombre de la Posición: " + df_positions['positionName'] + ' | ' + "Descripción: " + df_positions['positionDescription']
+
+    def services_to_string(services):
+        service_strings = []
+        for service in services:
+            service_string = f"{service['serviceName']}"
+            service_strings.append(service_string)
+        return ', '.join(service_strings)
+
+    df_positions['services_str'] = df_positions['services'].apply(services_to_string)
+
+    # # create the 'concat_feature' column
+    df_positions['concat_feature'] = "Nombre del Trabajador: " + df_positions['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_positions['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_positions['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_positions['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_positions['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_positions['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_positions['endTime'] + "|" + "Servicios: " + df_positions['services_str']
 
     # Function to process embeddings in batches
     def generate_embeddings_in_batches(texts, batch_size=100):
@@ -95,18 +105,16 @@ def openai():
         joined_instructions = "\n".join(instructions)
 
         bot_messages = [
-          {"role": "system", "content": f"""Asistente es un chatbot virtual amable de una empresa encargada en ofrecer los servicios de expertos y expertas en desarrollo de sofware, desarrollo de aplicaciones web y desarrollo de aplicaciones móviles. Asistente ayuda a los usuarios a brindar información sobre los servicios o cargos de la empresa, y a agendar un turno para ser atendido con un trabajador.     
-               
-           ACTIVIDAD DE LA EMPRESA:
+          {"role": "system", "content": f"""
+           CONTEXTO:
+           Asistente es un chatbot virtual amable encargado de brindar información de los servicios y horarios de atención de la empresa {company_context['companyName']}.
+           Asistente ayuda a los usuarios a realizar el agendamiento de un turno para ser atendido con un trabajador
+
+           SERVICIO DE LA EMPRESA:
            {company_context['companyActivity']}
 
            DESCRIPCIÓN DE LA EMPRESA:
            {company_context['companyDescription']}
-
-           CONTEXTO DE LA CONVERSACIÓN:
-            - El usuario hace una pregunta sobre los servicios de la empresa o solicitando información sobre un cargo disponible
-            - El usuario puede preguntar por un cargo disponible o por un horario de atención
-            - El usuario puede solicitar realizar el agendamiento de un turno en base al HORARIO DE AGENDAMIENTO DISPONIBLE de un trabajador
                
             INSTRUCCIONES:
            {joined_instructions}
@@ -122,6 +130,10 @@ def openai():
             CARGO DEL TRABAJADOR:
             - CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
             - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
+
+            SERVICIOS DEL TRABAJADOR:
+            - SERVICIOS: {df_similars.iloc[0]['services_str']}
+
         """}]
 
         for message in conversation_history:
