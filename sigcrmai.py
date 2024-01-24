@@ -47,6 +47,8 @@ def openai():
         instructions.append(instruction['instruccion'])
 
     company_context = body['companyContext'][0]
+    # print('company_context: ', company_context['companyName'])
+    # return 'ok', 200
 
     os.environ['OPENAI_API_KEY'] = api_key
     client = OpenAI()
@@ -117,8 +119,8 @@ def openai():
         bot_messages = [
           {"role": "system", "content": f"""
            CONTEXTO:
-           Asistente es un chatbot virtual amable encargado de brindar información de los servicios y horarios de atención de la empresa {company_context['companyName']}.
            Asistente ayuda a los usuarios a realizar el agendamiento de un turno para ser atendido con un trabajador
+           Asistente es un chatbot virtual amable encargado de brindar información de los servicios y horarios de atención de la empresa {company_context['companyName']}.
 
            SERVICIO DE LA EMPRESA:
            {company_context['companyActivity']}
@@ -158,9 +160,10 @@ def openai():
     df_similars = get_df_similares(question, df_positions)
     answer = get_response(question, df_similars, instructions, company_context)
 
+    schedule_id = int(df_similars.iloc[0]['scheduleId'])
     response = {
         'answer': answer,
-        'scheduleId': df_similars.iloc[0]['scheduleId']
+        'scheduleId': schedule_id
     }
     return response, 200
 
