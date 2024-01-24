@@ -72,10 +72,8 @@ def openai():
         return response, 200
     
     df_api_response = pd.DataFrame(api_response)
-
     positions = df_api_response['positionName'].unique().tolist()
-    services = df_api_response['services'].tolist()
-
+    
     def services_to_string(services):
         service_strings = []
         for service in services:
@@ -84,6 +82,7 @@ def openai():
         return ', '.join(service_strings)
 
     df_api_response['services_str'] = df_api_response['services'].apply(services_to_string)
+    services = df_api_response['services_str'].tolist()
 
     # # create the 'concat_feature' column
     df_api_response['concat_feature'] = "Nombre del Trabajador: " + df_api_response['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_api_response['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_api_response['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_api_response['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_api_response['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_api_response['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_api_response['endTime'] + "|" + "Servicios: " + df_api_response['services_str']
