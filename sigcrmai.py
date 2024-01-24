@@ -121,18 +121,16 @@ def openai():
 
             HORARIO DE AGENDAMIENTO DISPONIBLE:
             - NOMBRE DEL TRABAJADOR: {df_similars.iloc[0]['employeeNames'] + " " + df_similars.iloc[0]['employeeLastNames']}
-            - CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
-            - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
             - HORARIO DE INICIO DEL TRABAJADOR: {df_similars.iloc[0]['startTime']}
             - HORARIO DE FINALIZACIÓN DEL TRABAJADOR: {df_similars.iloc[0]['endTime']}
             - DÍA DE LA SEMANA DEL HORARIO DEL TRABAJADOR: {df_similars.iloc[0]['day']}
 
-            CARGO DEL TRABAJADOR:
-            - CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
+            CARGO DISPONIBLE:
+            - NOMBRE DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
             - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
 
-            SERVICIOS DEL TRABAJADOR:
-            - SERVICIOS: {df_similars.iloc[0]['services_str']}
+            SERVICIOS DISPONIBLES:
+            - SERVICIOS DEL TRABAJADOR: {df_similars.iloc[0]['services_str']}
 
         """}]
 
@@ -152,8 +150,7 @@ def openai():
 
     response = {
         'answer': answer,
-        'positionName': df_similars.iloc[0]['positionName'],
-        'positionDescription': df_similars.iloc[0]['positionDescription']
+        'scheduleId': df_similars.iloc[0]['scheduleId']
     }
     return response, 200
 
