@@ -52,6 +52,9 @@ def openai():
     client = OpenAI()
 
     api_url = main_domain + "/" + api_url + "/" + company_id
+    # api_url = "https://sigcrm.pro/api/services/18"
+    # print(api_url)
+    # return api_url, 200
     positions = []
     response = requests.get(api_url)
 
@@ -60,6 +63,13 @@ def openai():
         positions = data['data']
     else:
         return "Error: ", response.status_code
+    
+    if len(positions) == 0:
+        response = {
+            'answer': 'Lo sentimos. No existen las configuracinones necesatias para generar un agendamiento. Por favor, contacte con el administrador de la empresa.',
+            'scheduleId': ''
+        }
+        return response, 200
     
     df_positions = pd.DataFrame(positions)
 
