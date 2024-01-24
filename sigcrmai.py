@@ -47,8 +47,6 @@ def openai():
         instructions.append(instruction['instruccion'])
 
     company_context = body['companyContext'][0]
-    # print('company_context: ', company_context['companyName'])
-    # return 'ok', 200
 
     os.environ['OPENAI_API_KEY'] = api_key
     client = OpenAI()
@@ -57,23 +55,26 @@ def openai():
     # api_url = "https://sigcrm.pro/api/services/18"
     # print(api_url)
     # return api_url, 200
-    positions = []
+    api_response = []
     response = requests.get(api_url)
 
     if response.status_code == 200:
-        data = response.json()
-        positions = data['data']
+        api_response = response.json()
+        api_response = api_response['data']
     else:
         return "Error: ", response.status_code
     
-    if len(positions) == 0:
+    if len(api_response) == 0:
         response = {
             'answer': 'Lo sentimos. No existen las configuracinones necesatias para generar un agendamiento. Por favor, contacte con el administrador de la empresa.',
             'scheduleId': ''
         }
         return response, 200
     
-    df_positions = pd.DataFrame(positions)
+    df_api_response = pd.DataFrame(api_response)
+
+    positions = df_api_response['positionName'].unique().tolist()
+    services = df_api_response['services'].tolist()
 
     def services_to_string(services):
         service_strings = []
@@ -82,10 +83,10 @@ def openai():
             service_strings.append(service_string)
         return ', '.join(service_strings)
 
-    df_positions['services_str'] = df_positions['services'].apply(services_to_string)
+    df_api_response['services_str'] = df_api_response['services'].apply(services_to_string)
 
     # # create the 'concat_feature' column
-    df_positions['concat_feature'] = "Nombre del Trabajador: " + df_positions['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_positions['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_positions['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_positions['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_positions['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_positions['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_positions['endTime'] + "|" + "Servicios: " + df_positions['services_str']
+    df_api_response['concat_feature'] = "Nombre del Trabajador: " + df_api_response['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_api_response['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_api_response['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_api_response['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_api_response['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_api_response['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_api_response['endTime'] + "|" + "Servicios: " + df_api_response['services_str']
 
     # Function to process embeddings in batches
     def generate_embeddings_in_batches(texts, batch_size=100):
@@ -97,7 +98,7 @@ def openai():
         return all_embeddings
 
     # Apply batch processing for embeddings
-    df_positions['embedding'] = generate_embeddings_in_batches(df_positions['concat_feature'].tolist())
+    df_api_response['embedding'] = generate_embeddings_in_batches(df_api_response['concat_feature'].tolist())
 
     def get_df_similares(question, df):
         # Generate embedding for the question
@@ -112,15 +113,17 @@ def openai():
 
         return df.sort_values("similarities", ascending=False)
 
-    def get_response(question, df_similars, instructions, company_context):
+    def get_response(question, df_similars, instructions, company_context, positions, services):
         client = OpenAI()
         joined_instructions = "\n".join(instructions)
+        joined_positions = "\n".join(positions)
+        joined_services = "\n".join(services)
 
         bot_messages = [
           {"role": "system", "content": f"""
            CONTEXTO:
            Asistente ayuda a los usuarios a realizar el agendamiento de un turno para ser atendido con un trabajador
-           Asistente es un chatbot virtual amable encargado de brindar información de los servicios y horarios de atención de la empresa {company_context['companyName']}.
+           Asistente es un chatbot virtual amable encargado de brindar información de los cargos, servicios y horarios de atención de los trabajadores en la empresa {company_context['companyName']}.
 
            SERVICIO DE LA EMPRESA:
            {company_context['companyActivity']}
@@ -137,13 +140,17 @@ def openai():
             - HORARIO DE FINALIZACIÓN DEL TRABAJADOR: {df_similars.iloc[0]['endTime']}
             - DÍA DE LA SEMANA DEL HORARIO DEL TRABAJADOR: {df_similars.iloc[0]['day']}
 
-            CARGO DISPONIBLE:
-            - NOMBRE DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionName']}
-            - DESCRIPCIÓN DEL CARGO DEL TRABAJADOR: {df_similars.iloc[0]['positionDescription']}
+            CARGO MÁS COINCIDENTE:
+            - NOMBRE DEL CARGO: {df_similars.iloc[0]['positionName']}
+            - DESCRIPCIÓN: {df_similars.iloc[0]['positionDescription']}
+
+            SERVICIOS MÁS COINDIDENTES: {df_similars.iloc[0]['services_str']}
+
+            CARGOS DISPONIBLES:
+            {joined_positions}
 
             SERVICIOS DISPONIBLES:
-            - SERVICIOS DEL TRABAJADOR: {df_similars.iloc[0]['services_str']}
-
+            {joined_services}
         """}]
 
         for message in conversation_history:
@@ -157,8 +164,8 @@ def openai():
         )
         return completion.choices[0].message.content
     
-    df_similars = get_df_similares(question, df_positions)
-    answer = get_response(question, df_similars, instructions, company_context)
+    df_similars = get_df_similares(question, df_api_response)
+    answer = get_response(question, df_similars, instructions, company_context, positions, services)
 
     schedule_id = int(df_similars.iloc[0]['scheduleId'])
     response = {
@@ -193,16 +200,16 @@ def create_embedding():
     os.environ['OPENAI_API_KEY'] = api_key
     client = OpenAI()
     
-    positions = []
+    api_response = []
     response = requests.get(full_url)
     if response.status_code == 200:
         data = response.json()
-        positions = data['data']
+        api_response = data['data']
     else:
         return "Error: ", response.status_code
     
     # create the 'concat_feature' column
-    df_concat_feature = pd.DataFrame(positions)
+    df_concat_feature = pd.DataFrame(api_response)
     df_concat_feature['concat_feature'] = "Cargo: " + df_concat_feature['positionName'] + ' | ' + "Descripción: " + df_concat_feature['positionDescription']
     # create the 'embedding' column
     df_concat_feature['embedding'] = df_concat_feature['concat_feature'].apply(lambda x: client.embeddings.create(model='text-embedding-ada-002', input=x, encoding_format='float').data[0].embedding)
