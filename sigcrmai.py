@@ -80,7 +80,7 @@ def openai():
             api_response_by_services.append(combined_entry)
 
     df_api_response = pd.DataFrame(api_response_by_services)
-    df_api_response(['employeeId', 'positionId'], axis=1, inplace=True)
+    df_api_response.drop(['employeeId', 'positionId'], axis=1, inplace=True)
 
     positions = df_api_response['positionName'].unique().tolist()
     services = df_api_response['serviceName'].unique().tolist()
