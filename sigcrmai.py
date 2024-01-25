@@ -71,21 +71,22 @@ def openai():
         }
         return response, 200
     
-    df_api_response = pd.DataFrame(api_response)
+    api_response_by_services = []
+
+    for employee in api_response:
+        for service in employee['services']:
+            combined_entry = {**employee, **service}
+            combined_entry.pop('services', None)
+            api_response_by_services.append(combined_entry)
+
+    df_api_response = pd.DataFrame(api_response_by_services)
+    df_api_response(['employeeId', 'positionId'], axis=1, inplace=True)
+
     positions = df_api_response['positionName'].unique().tolist()
-    
-    def services_to_string(services):
-        service_strings = []
-        for service in services:
-            service_string = f"{service['serviceName']}"
-            service_strings.append(service_string)
-        return ', '.join(service_strings)
-
-    df_api_response['services_str'] = df_api_response['services'].apply(services_to_string)
-    services = df_api_response['services_str'].tolist()
-
+    services = df_api_response['serviceName'].unique().tolist()
+  
     # # create the 'concat_feature' column
-    df_api_response['concat_feature'] = "Nombre del Trabajador: " + df_api_response['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_api_response['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_api_response['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_api_response['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_api_response['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_api_response['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_api_response['endTime'] + "|" + "Servicios: " + df_api_response['services_str']
+    df_api_response['concat_feature'] = "Nombre del Trabajador: " + df_api_response['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_api_response['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_api_response['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_api_response['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_api_response['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_api_response['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_api_response['endTime'] + "|" + "Servicio del trabajador: " + df_api_response['serviceName']
 
     # Function to process embeddings in batches
     def generate_embeddings_in_batches(texts, batch_size=100):
@@ -111,6 +112,7 @@ def openai():
         df['similarities'] = cosine_similarity(df_embeddings, question_embedding_arr).flatten()
 
         return df.sort_values("similarities", ascending=False)
+
 
     def get_response(question, df_similars, instructions, company_context, positions, services):
         client = OpenAI()
@@ -143,7 +145,10 @@ def openai():
             - NOMBRE DEL CARGO: {df_similars.iloc[0]['positionName']}
             - DESCRIPCIÓN: {df_similars.iloc[0]['positionDescription']}
 
-            SERVICIOS MÁS COINDIDENTES: {df_similars.iloc[0]['services_str']}
+            SERVICIO MÁS COINDIDENTE:
+            - NOMBRE DEL SERVICIO: {df_similars.iloc[0]['serviceName']}
+            - DESCRIPCIÓN: {df_similars.iloc[0]['serviceDescription']}
+            - COSTO DEL SERVICIO EN DÓLARES: {df_similars.iloc[0]['serviceCost']}
 
             CARGOS DISPONIBLES:
             {joined_positions}
@@ -167,9 +172,11 @@ def openai():
     answer = get_response(question, df_similars, instructions, company_context, positions, services)
 
     schedule_id = int(df_similars.iloc[0]['scheduleId'])
+    service_id = int(df_similars.iloc[0]['serviceId'])
     response = {
         'answer': answer,
-        'scheduleId': schedule_id
+        'scheduleId': schedule_id,
+        'serviceId': service_id
     }
     return response, 200
 
