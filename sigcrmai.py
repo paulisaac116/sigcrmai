@@ -30,6 +30,12 @@ def openai():
     if 'apiUrl' not in body:
         return 'No apiUrl provided', 400
     
+    if len(body['companyContext']) == 0:
+        return 'No company context provided', 400
+    
+    if len(body['instructions']) == 0:
+        return 'No instructions provided', 400
+    
     question = body['question']
     company_id = body['companyId']
     company_id = str(company_id)
