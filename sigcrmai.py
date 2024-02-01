@@ -27,9 +27,6 @@ def openai():
     if 'apiKey' not in body:
         return 'No apiKey provided', 400
     
-    if 'mainDomain' not in body:
-        return 'No mainDomain provided', 400
-    
     if 'apiUrl' not in body:
         return 'No apiUrl provided', 400
     
@@ -37,7 +34,6 @@ def openai():
     company_id = body['companyId']
     company_id = str(company_id)
     api_key = body['apiKey']
-    main_domain = body['mainDomain']
     api_url = body['apiUrl']
     conversation_history = body['chatHistory']
     bot_instructions = body['instructions']
@@ -51,22 +47,16 @@ def openai():
     os.environ['OPENAI_API_KEY'] = api_key
     client = OpenAI()
 
-    api_url = main_domain + "/" + api_url + "/" + company_id
-    # api_url = "https://sigcrm.pro/api/services/18"
-    # print(api_url)
-    # return api_url, 200
+    api_url = company_context['companyUrl']+ "/" + api_url + "/" + company_id
     api_response = []
     response = requests.get(api_url)
 
     if response.status_code == 200:
         api_response = response.json()
         api_response = api_response['data']
-    else:
-        return "Error: ", response.status_code
-    
-    if len(api_response) == 0:
+    elif response.status_code == 404:
         response = {
-            'answer': 'Lo sentimos. No existen las configuracinones necesatias para generar un agendamiento. Por favor, contacte con el administrador de la empresa.',
+            'answer': 'Lo sentimos. No existen las configuracinones necesarias para generar un agendamiento. Por favor, contacte con el administrador de la empresa.',
             'scheduleId': ''
         }
         return response, 200
