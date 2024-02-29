@@ -63,26 +63,27 @@ def openai():
     elif response.status_code == 404:
         response = {
             'answer': 'Lo sentimos. No existen las configuracinones necesarias para generar un agendamiento. Por favor, contacte con el administrador de la empresa.',
-            'scheduleId': ''
+            'productId': ''
         }
         return response, 200
     
-    api_response_by_services = []
+    # api_response_by_services = []
 
-    for employee in api_response:
-        for service in employee['services']:
-            combined_entry = {**employee, **service}
-            combined_entry.pop('services', None)
-            api_response_by_services.append(combined_entry)
+    # for employee in api_response:
+    #     for service in employee['services']:
+    #         combined_entry = {**employee, **service}
+    #         combined_entry.pop('services', None)
+    #         api_response_by_services.append(combined_entry)
+    # df_api_response = pd.DataFrame(api_response_by_services)
 
-    df_api_response = pd.DataFrame(api_response_by_services)
-    df_api_response.drop(['employeeId', 'positionId'], axis=1, inplace=True)
+    df_api_response = pd.DataFrame(api_response)
+    # df_api_response.drop(['employeeId', 'positionId'], axis=1, inplace=True)
 
-    positions = df_api_response['positionName'].unique().tolist()
-    services = df_api_response['serviceName'].unique().tolist()
+    products = df_api_response['productName'].unique().tolist()
   
     # # create the 'concat_feature' column
-    df_api_response['concat_feature'] = "Nombre del Trabajador: " + df_api_response['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_api_response['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_api_response['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_api_response['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_api_response['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_api_response['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_api_response['endTime'] + "|" + "Servicio del trabajador: " + df_api_response['serviceName']
+    # df_api_response['concat_feature'] = "Nombre del Trabajador: " + df_api_response['employeeNames']  + "|" + "Apellidos del Trabajador: " + df_api_response['employeeLastNames'] + "|" +  "Nombre del Cargo del Trabajador: " + df_api_response['positionName'] + ' | ' + "Descripción del Cargo del Trabajador: " + df_api_response['positionDescription'] + "|" + "Día de la semana del horario de atención del trabajador: " + df_api_response['day'] +  "|" + "Hora de inicio del horario de atención del trabajador: " + df_api_response['startTime'] + "|" + "Hora de finalización del horario de atención del trabajador: " + df_api_response['endTime'] + "|" + "Servicio del trabajador: " + df_api_response['serviceName']
+    df_api_response['concat_feature'] = "Nombre del Producto: " + df_api_response['productName']  + "|" + "Descripción del Producto: " + df_api_response['productDescription'] + "|" +  "Precio del Producto: " + df_api_response['productPrice'] + ' | ' + "Categoría del Producto: " + df_api_response['classification']
 
     # Function to process embeddings in batches
     def generate_embeddings_in_batches(texts, batch_size=100):
@@ -110,11 +111,10 @@ def openai():
         return df.sort_values("similarities", ascending=False)
 
 
-    def get_response(question, df_similars, instructions, company_context, positions, services):
+    def get_response(question, df_similars, instructions, company_context, products):
         client = OpenAI()
         joined_instructions = "\n".join(instructions)
-        joined_positions = "\n".join(positions)
-        joined_services = "\n".join(services)
+        joined_products = "\n".join(products)
 
         bot_messages = [
           {"role": "system", "content": f"""
@@ -122,35 +122,20 @@ def openai():
            Asistente ayuda a los usuarios a realizar el agendamiento de un turno para ser atendido con un trabajador
            Asistente es un chatbot virtual amable encargado de brindar información de los cargos, servicios y horarios de atención de los trabajadores en la empresa {company_context['companyName']}.
 
-           SERVICIO DE LA EMPRESA:
-           {company_context['companyActivity']}
-
            DESCRIPCIÓN DE LA EMPRESA:
            {company_context['companyDescription']}
                
             INSTRUCCIONES:
            {joined_instructions}
 
-            HORARIO DE AGENDAMIENTO DISPONIBLE:
-            - NOMBRE DEL TRABAJADOR: {df_similars.iloc[0]['employeeNames'] + " " + df_similars.iloc[0]['employeeLastNames']}
-            - HORARIO DE INICIO DEL TRABAJADOR: {df_similars.iloc[0]['startTime']}
-            - HORARIO DE FINALIZACIÓN DEL TRABAJADOR: {df_similars.iloc[0]['endTime']}
-            - DÍA DE LA SEMANA DEL HORARIO DEL TRABAJADOR: {df_similars.iloc[0]['day']}
+            PRODUCTO MÁS COINDIDENTE:
+            - NOMBRE DEL PRODUCTO: {df_similars.iloc[0]['productName']}
+            - DESCRIPCIÓN: {df_similars.iloc[0]['productDescription']}
+            - COSTO DEL PRODUCTO EN DÓLARES: {df_similars.iloc[0]['productPrice']}
 
-            CARGO MÁS COINCIDENTE:
-            - NOMBRE DEL CARGO: {df_similars.iloc[0]['positionName']}
-            - DESCRIPCIÓN: {df_similars.iloc[0]['positionDescription']}
+            PRODUCTOS DISPONIBLES:
+            {joined_products}
 
-            SERVICIO MÁS COINDIDENTE:
-            - NOMBRE DEL SERVICIO: {df_similars.iloc[0]['serviceName']}
-            - DESCRIPCIÓN: {df_similars.iloc[0]['serviceDescription']}
-            - COSTO DEL SERVICIO EN DÓLARES: {df_similars.iloc[0]['serviceCost']}
-
-            CARGOS DISPONIBLES:
-            {joined_positions}
-
-            SERVICIOS DISPONIBLES:
-            {joined_services}
         """}]
 
         for message in conversation_history:
@@ -165,14 +150,12 @@ def openai():
         return completion.choices[0].message.content
     
     df_similars = get_df_similares(question, df_api_response)
-    answer = get_response(question, df_similars, instructions, company_context, positions, services)
+    answer = get_response(question, df_similars, instructions, company_context, products)
 
-    schedule_id = int(df_similars.iloc[0]['scheduleId'])
-    service_id = int(df_similars.iloc[0]['serviceId'])
+    product_id = int(df_similars.iloc[0]['productId'])
     response = {
         'answer': answer,
-        'scheduleId': schedule_id,
-        'serviceId': service_id
+        'productId': product_id
     }
     return response, 200
 
