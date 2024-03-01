@@ -119,8 +119,8 @@ def openai():
         bot_messages = [
           {"role": "system", "content": f"""
            CONTEXTO:
-           Asistente ayuda a los usuarios a realizar el agendamiento de un turno para ser atendido con un trabajador
-           Asistente es un chatbot virtual amable encargado de brindar información de los cargos, servicios y horarios de atención de los trabajadores en la empresa {company_context['companyName']}.
+           Asistente es un chatbot virtual alegre encargdo de ofertar y vender productos que los usuarios necesitan
+           Asistente es un chatbot virtual amable encargado de brindar información de los productos y servicios en la empresa {company_context['companyName']}.
 
            DESCRIPCIÓN DE LA EMPRESA:
            {company_context['companyDescription']}
